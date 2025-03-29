@@ -77,10 +77,13 @@ jobs:
         echo -e "$(nproc) thread compile"
         make olddefconfig
         make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "::set-output name=status::success"
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "::set-env name=DEVICE_NAME::_$(cat DEVICE_NAME)"
-        echo "::set-env name=FILE_DATE::_$(date +"%Y%m%d%H%M")"
+        echo "status=success" >> $GITHUB_OUTPUT
+        DEVICE_NAME=$(grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/')
+        if [ -n "$DEVICE_NAME" ]; then
+          echo "DEVICE_NAME=_$DEVICE_NAME" >> $GITHUB_ENV
+        fi
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
 
     - name: Check space usage
       if: (!cancelled())
@@ -98,8 +101,8 @@ jobs:
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
         cd buildroot/output/images
-        echo "::set-env name=FIRMWARE::$PWD"
-        echo "::set-output name=status::success"
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware directory
       uses: actions/upload-artifact@master
