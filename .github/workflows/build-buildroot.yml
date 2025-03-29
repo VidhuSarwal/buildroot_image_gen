@@ -16,7 +16,7 @@ on:
 
 env:
   REPO_URL: https://github.com/buildroot/buildroot
-  REPO_BRANCH: 2025.02.x #updated to latest
+  REPO_BRANCH: 2024.11.x #updated to latest
   CONFIG_FILE: .config
   SSH_ACTIONS: false
   UPLOAD_BIN_DIR: false
