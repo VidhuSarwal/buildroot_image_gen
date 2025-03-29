@@ -60,6 +60,10 @@ jobs:
         [ -e files ] && mv files buildroot/files
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE buildroot/.config
         cd buildroot
+        if [ ! -f .config ]; then
+        echo "Error: .config file not found!"
+        exit 1
+        fi
 
     - name: SSH connection to Actions
       uses: csexton/debugger-action@master
