@@ -2,7 +2,7 @@ name: Build BeagleBone Black Image with Tester
 
 on:
   push:
-    branches: [ main ]
+    branches: [ beagle-tester ]
   workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
 
 jobs:
