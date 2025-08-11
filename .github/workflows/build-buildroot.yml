@@ -1,113 +1,50 @@
-name: Build Buildroot
+name: Build BeagleBone Black Image with Tester
 
 on:
-  repository_dispatch:
-  release:
-    types: published
   push:
-    branches:
-      - master
-    paths:
-      - '.config'
-#  schedule:
-#    - cron: 0 8 * * 5
-#  watch:
-#    types: started
-
-env:
-  REPO_URL: https://github.com/buildroot/buildroot
-  REPO_BRANCH: 2024.11.x #updated to latest
-  CONFIG_FILE: .config
-  SSH_ACTIONS: false
-  UPLOAD_BIN_DIR: false
-  UPLOAD_FIRMWARE: true
-  UPLOAD_COWTRANSFER: false
-  UPLOAD_WETRANSFER: false
-  TZ: Asia/Kolkata
+    branches: [ main ]
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.event.repository.owner.id == github.event.sender.id
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@master
+    - name: Checkout Buildroot
+      uses: actions/checkout@v4
+      # This step checks out your Buildroot repository.
+      # Assumes this workflow file is in your Buildroot repo.
+      with:
+        path: 'buildroot'
 
-    - name: Initialization environment
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-        sudo -E apt-get -qq update
-        sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
-        sudo -E apt-get -qq autoremove --purge
-        sudo -E apt-get -qq clean
-        sudo apt install wget git bc bison linux-headers-$(uname -r)
-        sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
+    - name: Checkout beagle-tester
+      uses: actions/checkout@v4
+      # This step checks out your application from the specified repository.
+      with:
+        repository: 'VidhuSarwal/beagle-tester' # <-- Fetches from your repo
+        path: 'buildroot/package/beagle-tester'  # <-- Places it in the correct Buildroot directory
 
-    - name: Clone source code
-      working-directory: /workdir
-      run: |
-        df -hT $PWD
-        git clone --depth 1 $REPO_URL -b $REPO_BRANCH buildroot
-        ln -sf /workdir/buildroot $GITHUB_WORKSPACE/buildroot
+    - name: Install Buildroot dependencies
+      run: sudo apt-get update && sudo apt-get install -y build-essential libncurses5-dev
 
-    - name: Load custom configuration
+    - name: Configure and Build for BeagleBone Black
+      working-directory: ./buildroot
       run: |
-        [ -e files ] && mv files buildroot/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE buildroot/.config
-        cd buildroot
-        if [ ! -f .config ]; then
-        echo "Error: .config file not found!"
-        exit 1
-        fi
+        # 1. Apply the default BeagleBone Black configuration
+        make beaglebone_defconfig
+
+        # 2. Enable the beagle-tester package by adding it to the .config file
+        echo "BR2_PACKAGE_BEAGLE_TESTER=y" >> .config
+        
+        # 3. Update the configuration to include any dependencies for the new package
         make olddefconfig
 
-    - name: SSH connection to Actions
-      uses: csexton/debugger-action@master
-      if: env.SSH_ACTIONS == 'true' || contains(github.event.action, 'ssh')
+        # 4. Run the build process
+        echo "Starting Buildroot make..."
+        make
 
-    - name: Compile the firmware
-      id: compile
-      run: |
-        cd buildroot
-        echo -e "$(nproc) thread compile"
-        make olddefconfig
-        make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "status=success" >> $GITHUB_OUTPUT
-        DEVICE_NAME=$(grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/')
-        if [ -n "$DEVICE_NAME" ]; then
-          echo "DEVICE_NAME=_$DEVICE_NAME" >> $GITHUB_ENV
-        fi
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
-
-
-    - name: Check space usage
-      if: (!cancelled())
-      run: df -hT
-
-    - name: Upload bin directory
-      uses: actions/upload-artifact@master
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+    - name: Upload Image Artifact
+      uses: actions/upload-artifact@v4
       with:
-        name: buildroot_target${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: buildroot/output/images
-
-    - name: Organize files
-      id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
-      run: |
-        cd buildroot/output/images
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
-
-    - name: Upload firmware directory
-      uses: actions/upload-artifact@master
-      if: steps.organize.outputs.status == 'success' && !cancelled()
-      with:
-        name: buildroot_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE }}
-
+        name: beaglebone-black-image
+        path: buildroot/output/images/sdcard.img
