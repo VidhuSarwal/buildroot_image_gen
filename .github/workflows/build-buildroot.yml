@@ -2,8 +2,8 @@ name: Build BeagleBone Black Image with Tester
 
 on:
   push:
-    branches: [ beagle-tester ]
-  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,34 +12,42 @@ jobs:
     steps:
     - name: Checkout Buildroot
       uses: actions/checkout@v4
-      # This step checks out your Buildroot repository.
-      # Assumes this workflow file is in your Buildroot repo.
       with:
+        repository: 'buildroot/buildroot' # Using the official Buildroot repo
         path: 'buildroot'
 
     - name: Checkout beagle-tester
       uses: actions/checkout@v4
-      # This step checks out your application from the specified repository.
       with:
-        repository: 'VidhuSarwal/beagle-tester' # <-- Fetches from your repo
-        path: 'buildroot/package/beagle-tester'  # <-- Places it in the correct Buildroot directory
+        repository: 'VidhuSarwal/beagle-tester'
+        path: 'buildroot/package/beagle-tester'
 
     - name: Install Buildroot dependencies
       run: sudo apt-get update && sudo apt-get install -y build-essential libncurses5-dev
 
     - name: Configure and Build for BeagleBone Black
+      # This directive ensures all commands in 'run' execute inside the 'buildroot' directory
       working-directory: ./buildroot
       run: |
-        # 1. Apply the default BeagleBone Black configuration
-        make beaglebone_defconfig
+        # --- DEBUGGING STEP ---
+        # 1. Print the current working directory to confirm we are in the right place
+        echo "Current directory: $(pwd)"
+        
+        # 2. List the contents of the 'configs' directory to ensure the defconfig file exists
+        echo "Checking for beaglebone_defconfig..."
+        ls -F configs/ | grep 'beaglebone'
 
-        # 2. Enable the beagle-tester package by adding it to the .config file
+        # --- BUILD STEPS ---
+        # 3. Apply the default BeagleBone Black configuration
+        make beaglebone_defconfig
+        
+        # 4. Enable the beagle-tester package
         echo "BR2_PACKAGE_BEAGLE_TESTER=y" >> .config
         
-        # 3. Update the configuration to include any dependencies for the new package
+        # 5. Update the configuration
         make olddefconfig
 
-        # 4. Run the build process
+        # 6. Run the build
         echo "Starting Buildroot make..."
         make
 
