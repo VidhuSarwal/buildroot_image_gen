@@ -2,7 +2,7 @@ name: Build BeagleBone Black Image with Tester
 
 on:
   push:
-    branches: [ main ]
+    branches: [ beagle-tester ]
   workflow_dispatch:
 
 jobs:
@@ -13,7 +13,11 @@ jobs:
     - name: Checkout Buildroot
       uses: actions/checkout@v4
       with:
-        repository: 'buildroot/buildroot' # Using the official Buildroot repo
+        # --- THIS IS THE FIX ---
+        # Explicitly check out the official Buildroot repository
+        repository: 'buildroot/buildroot'
+        # Use a specific stable version for reproducible builds
+        ref: '2024.05.2'
         path: 'buildroot'
 
     - name: Checkout beagle-tester
@@ -23,31 +27,21 @@ jobs:
         path: 'buildroot/package/beagle-tester'
 
     - name: Install Buildroot dependencies
-      run: sudo apt-get update && sudo apt-get install -y build-essential libncurses5-dev
+      run: sudo apt-get update && sudo apt-get install -y build-essential libncurses5-dev cpio
 
     - name: Configure and Build for BeagleBone Black
-      # This directive ensures all commands in 'run' execute inside the 'buildroot' directory
       working-directory: ./buildroot
       run: |
-        # --- DEBUGGING STEP ---
-        # 1. Print the current working directory to confirm we are in the right place
-        echo "Current directory: $(pwd)"
-        
-        # 2. List the contents of the 'configs' directory to ensure the defconfig file exists
-        echo "Checking for beaglebone_defconfig..."
-        ls -F configs/ | grep 'beaglebone'
-
-        # --- BUILD STEPS ---
-        # 3. Apply the default BeagleBone Black configuration
+        # 1. Apply the default BeagleBone Black configuration
         make beaglebone_defconfig
         
-        # 4. Enable the beagle-tester package
+        # 2. Enable the beagle-tester package by adding it to the .config file
         echo "BR2_PACKAGE_BEAGLE_TESTER=y" >> .config
         
-        # 5. Update the configuration
+        # 3. Update the configuration to include any dependencies for the new package
         make olddefconfig
 
-        # 6. Run the build
+        # 4. Run the build process
         echo "Starting Buildroot make..."
         make
 
