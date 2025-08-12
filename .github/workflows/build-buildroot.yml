@@ -13,10 +13,8 @@ jobs:
     - name: Checkout Buildroot
       uses: actions/checkout@v4
       with:
-        # --- THIS IS THE FIX ---
-        # Explicitly check out the official Buildroot repository
+        
         repository: 'buildroot/buildroot'
-        # Use a specific stable version for reproducible builds
         ref: '2024.05.2'
         path: 'buildroot'
 
